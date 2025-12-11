@@ -36,6 +36,7 @@ app/Models/Task.php に $fillable もしくは $guarded を設定する
 
 ただし、コマンド実行することでのなにが行われるかの理解と確認は履歴に残してください
 また、実際のテーブル確認などはphp artisan tinkerで確認してください。
+※hasTable と getColumnListingなどのコマンドがよいでしょう。
 ```
 
 #　回答例 
@@ -129,9 +130,14 @@ php artisan tinker で簡易確認する（例）
 
 ```
 php artisan tinker
->>> \Schema::hasTable('tasks');
-# true が返ってくればOK
+# テーブル存在確認true が返ってくればOK
+\Schema::hasTable('tasks');
 
+# カラム一覧を配列で取得
+\Schema::getColumnListing('tasks');
+
+#SQLite のときは、生のSQLでテーブル一覧を確認
+\DB::select('SELECT name FROM sqlite_master WHERE type = "table"');
 ```
 
 4. Task モデルの設定（$fillable / $guarded）
