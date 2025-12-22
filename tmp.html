@@ -1,0 +1,506 @@
+Let ( [
+/* ========= CSS/ヘッダ ========= */
+css = 
+"<!doctype html>
+<html lang='ja'>
+<head>
+<meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<style>
+html,body {
+  margin:0; padding:0; width:100%; height:100%;
+  background:#fff; overflow:hidden; box-sizing:border-box;
+}
+* { box-sizing:border-box; }
+
+/* 見出しを少しだけ低く */
+h3 {
+  text-align:center;
+  margin:2px 0;
+  padding:4px;
+  font-size:13px;
+  background:#f9b9d1;
+  border-radius:4px;
+}
+
+.container {
+  display:flex; flex-direction:column; gap:3px;
+  width:100%; height:100%; margin:0; padding:0 2px 2px;
+}
+
+table {
+  border-collapse:collapse; width:100%;
+  font-size:11.5px;
+  margin:0; table-layout:auto;
+}
+
+/* 行の高さを詰める */
+th, td {
+  border:1px solid #444;
+  padding:2px 4px;
+  line-height:1.15;
+  text-align:right;
+  overflow:visible;
+  white-space:normal;
+  word-break:break-all;
+}
+
+th {
+  background:#ffe5f0;
+  font-weight:bold;
+  text-align:center;
+}
+
+/* 1列目だけは折返しOK */
+td:first-child, th:first-child {
+  text-align:left;
+  white-space:normal;
+  word-break:break-word;
+  max-width:none;
+}
+
+/* 2列目の左寄せは維持 */
+td:nth-child(2) { background:#fbeadf; text-align:left; }
+td:nth-child(3) { background:#eaf3e0; }
+td:nth-child(9), td:nth-child(10), td:nth-child(11) { background:#fff7a8; }
+td:nth-child(n+12) { background:#d7ebfb; }
+
+tr.total td { background:none !important; font-weight:bold; }
+
+td, th { position:relative; transition:background-color .12s ease-in-out, outline-color .12s ease-in-out; }
+td:hover { background:#ffec99 !important; outline:2px solid rgba(255,180,0,.9); outline-offset:-2px; }
+tr:hover td { filter:brightness(1.02); }
+
+/* 正は着色しない。負だけ赤太字 */
+td.negative { color:#b42318; font-weight:bold; }
+
+</style>
+</head>
+<body>
+<div class='container'>" ;
+
+/* ── 選択年月 ── */
+selYM_text = GetAsText ( 計画進捗::年月_g ) ;
+selYM_num  = GetAsNumber ( selYM_text ) ;
+
+/* ── ヘッダ行（共通） ── */
+thead = 
+"    <tr>
+      <th>拠点名</th><th>運営会社</th><th>前月繰越</th><th>当月目標</th><th>実績</th>
+      <th>卸受注完了</th><th>受注残</th><th>達成率</th>
+      <th>専売</th><th>併売</th><th>テレマ</th>
+      <th>完工</th><th>最終予測</th><th>中間予測</th><th>総受注</th><th>当月受注</th><th>最終差異</th>
+    </tr>" ;
+
+/* =========================
+   大手販路（行は拠点別計画進捗）
+   ========================= */
+rowsA =
+Let ([
+  idxList = List ( 拠点別計画進捗::主キー ) ;
+  n = ValueCount ( idxList )
+] ;
+
+While (
+  [ i = 1 ; html = "" ] ;
+  i ≤ n ;
+  [
+    _分類       = GetNthRecord ( 拠点別計画進捗::分類 ; i ) ;
+    _年月       = GetAsNumber ( GetNthRecord ( 拠点別計画進捗::年月 ; i ) ) ;
+    _拠点名     = GetNthRecord ( 拠点別計画進捗::c_加盟店セット名 ; i ) ;
+    _運営会社   = GetNthRecord ( 拠点別計画進捗::c_運営会社 ; i ) ;
+    _前月繰越   = GetNthRecord ( 拠点別計画進捗::前月繰越 ; i ) ;
+    _当月目標   = GetNthRecord ( 拠点別計画進捗::c_当月目標 ; i ) ;
+    _実績       = GetNthRecord ( 拠点別計画進捗::実績 ; i ) ;
+    _卸受注完了 = GetNthRecord ( 拠点別計画進捗::卸受注完了 ; i ) ;
+    _受注残     = GetNthRecord ( 拠点別計画進捗::受注残 ; i ) ;
+    _達成率     = GetNthRecord ( 拠点別計画進捗::達成率 ; i ) ;
+    _専売       = GetNthRecord ( 拠点別計画進捗::c_専売人数 ; i ) ;
+    _併売       = GetNthRecord ( 拠点別計画進捗::c_併売人数 ; i ) ;
+    _テレマ人数 = GetNthRecord ( 拠点別計画進捗::c_テレマ人数 ; i ) ;
+    _完工       = GetNthRecord ( 拠点別計画進捗::完工 ; i ) ;
+    _最終予測   = GetNthRecord ( 拠点別計画進捗::c_最終予測 ; i ) ;
+    _中間予測   = GetNthRecord ( 拠点別計画進捗::c_中間予測 ; i ) ;
+    _総受注     = GetNthRecord ( 拠点別計画進捗::総受注 ; i ) ;
+    _当月受注   = GetNthRecord ( 拠点別計画進捗::当月受注 ; i ) ;
+    _最終差異   = GetNthRecord ( 拠点別計画進捗::最終差異 ; i ) ;
+
+    matchYM = Case ( IsEmpty ( selYM_text ) ; 1 ; _年月 = selYM_num ) ;
+    show    = Case ( _分類 = "大手販路" and matchYM ; 1 ; 0 ) ;
+
+    /* 正はクラスを付けない。負のみ negative */
+    cls = Case ( GetAsNumber ( _最終差異 ) < 0 ; "negative" ; "" ) ;
+
+    _達成率_disp = GetAsText ( _達成率 ) ;
+    _運営会社_out = GetAsText ( _運営会社 ) ;
+
+    row =
+      "<tr>" &
+        "<td>" & Substitute ( GetAsText ( _拠点名 ) ;
+              [ "&" ; "&amp;" ] ; [ "<" ; "&lt;" ] ; [ ">" ; "&gt;" ] ;
+              [ "\"" ; "&quot;" ] ; [ "'" ; "&#39;" ] ) & "</td>" &
+        "<td style='text-align:left'>" & Substitute ( _運営会社_out ;
+              [ "&" ; "&amp;" ] ; [ "<" ; "&lt;" ] ; [ ">" ; "&gt;" ] ;
+              [ "\"" ; "&quot;" ] ; [ "'" ; "&#39;" ] ) & "</td>" &
+        "<td>" & GetAsText ( _前月繰越 ) & "</td>" &
+        "<td>" & GetAsText ( _当月目標 ) & "</td>" &
+        "<td>" & GetAsText ( _実績 ) & "</td>" &
+        "<td>" & GetAsText ( _卸受注完了 ) & "</td>" &
+        "<td>" & GetAsText ( _受注残 ) & "</td>" &
+        "<td>" & _達成率_disp & "</td>" &
+        "<td>" & GetAsText ( _専売 ) & "</td>" &
+        "<td>" & GetAsText ( _併売 ) & "</td>" &
+        "<td>" & GetAsText ( _テレマ人数 ) & "</td>" &
+        "<td>" & GetAsText ( _完工 ) & "</td>" &
+        "<td>" & GetAsText ( _最終予測 ) & "</td>" &
+        "<td>" & GetAsText ( _中間予測 ) & "</td>" &
+        "<td>" & GetAsText ( _総受注 ) & "</td>" &
+        "<td>" & GetAsText ( _当月受注 ) & "</td>" &
+        "<td class='" & cls & "'>" & GetAsText ( _最終差異 ) & "</td>" &
+      "</tr>" ;
+
+    html = html & Case ( show ; row ; "" ) ;
+    i = i + 1
+  ] ;
+  html
+) ) ;
+
+/* 合計（大手販路） */
+A_list =
+Let ([
+  kbn = "大手販路" ;
+  sql_text =
+  "SELECT \"前月繰越\",\"当月目標\",\"実績\",\"卸受注完了\",\"受注残\",
+          \"達成率\",
+          \"専売\",\"併売\",\"テレマ\",\"完工\",
+          \"最終予測\",\"中間予測\",\"総受注\",\"当月受注\",
+          \"最終差異\"
+   FROM \"拠点別計画進捗_集計\"
+   WHERE \"分類\" = ? AND \"年月\" = ?" ;
+  sql_num = sql_text ;
+
+  r1 = ExecuteSQL ( sql_text ; "|" ; "" ; kbn ; selYM_text ) ;
+  r2 = Case ( ( r1 = "?" or IsEmpty ( r1 ) ) and not IsEmpty ( selYM_num ) ;
+              ExecuteSQL ( sql_num ; "|" ; "" ; kbn ; selYM_num ) ; "" ) ;
+
+  raw = Case ( not IsEmpty ( r1 ) and r1 ≠ "?" ; r1 ;
+               not IsEmpty ( r2 ) and r2 ≠ "?" ; r2 ;
+               "" )
+] ;
+  Substitute ( raw ; "|" ; "¶" )
+) ;
+
+tA_前月繰越   = GetAsNumber ( GetValue ( A_list ;  1 ) ) ;
+tA_当月目標   = GetAsNumber ( GetValue ( A_list ;  2 ) ) ;
+tA_実績       = GetAsNumber ( GetValue ( A_list ;  3 ) ) ;
+tA_卸受注完了 = GetAsNumber ( GetValue ( A_list ;  4 ) ) ;
+tA_受注残     = GetAsNumber ( GetValue ( A_list ;  5 ) ) ;
+tA_達成率表示 =                 GetValue ( A_list ;  6 ) ;
+tA_専売       = GetAsNumber ( GetValue ( A_list ;  7 ) ) ;
+tA_併売       = GetAsNumber ( GetValue ( A_list ;  8 ) ) ;
+tA_テレマ     = GetAsNumber ( GetValue ( A_list ;  9 ) ) ;
+tA_完工       = GetAsNumber ( GetValue ( A_list ; 10 ) ) ;
+tA_最終予測   = GetAsNumber ( GetValue ( A_list ; 11 ) ) ;
+tA_中間予測   = GetAsNumber ( GetValue ( A_list ; 12 ) ) ;
+tA_総受注     = GetAsNumber ( GetValue ( A_list ; 13 ) ) ;
+tA_当月受注   = GetAsNumber ( GetValue ( A_list ; 14 ) ) ;
+tA_最終差異   = GetAsNumber ( GetValue ( A_list ; 15 ) ) ;
+
+totalRowA =
+"<tr class='total'>" &
+  "<td colspan='2'>合計</td>" &
+  "<td>" & tA_前月繰越 & "</td>" &
+  "<td>" & tA_当月目標 & "</td>" &
+  "<td>" & tA_実績 & "</td>" &
+  "<td>" & tA_卸受注完了 & "</td>" &
+  "<td>" & tA_受注残 & "</td>" &
+  "<td>" & tA_達成率表示 & "</td>" &
+  "<td>" & tA_専売 & "</td>" &
+  "<td>" & tA_併売 & "</td>" &
+  "<td>" & tA_テレマ & "</td>" &
+  "<td>" & tA_完工 & "</td>" &
+  "<td>" & tA_最終予測 & "</td>" &
+  "<td>" & tA_中間予測 & "</td>" &
+  "<td>" & tA_総受注 & "</td>" &
+  "<td>" & tA_当月受注 & "</td>" &
+  "<td>" & tA_最終差異 & "</td>" &
+"</tr>" ;
+
+/* =========================
+   主力販路（テレマ固定）
+   ========================= */
+rowsB =
+Let ([
+  idxList = List ( 拠点別計画進捗::主キー ) ;
+  n = ValueCount ( idxList )
+] ;
+
+While (
+  [ i = 1 ; html = "" ] ;
+  i ≤ n ;
+  [
+    _分類       = GetNthRecord ( 拠点別計画進捗::分類 ; i ) ;
+    _年月       = GetAsNumber ( GetNthRecord ( 拠点別計画進捗::年月 ; i ) ) ;
+    _拠点名     = GetNthRecord ( 拠点別計画進捗::c_加盟店セット名 ; i ) ;
+    _運営会社   = GetNthRecord ( 拠点別計画進捗::c_運営会社 ; i ) ;
+    _前月繰越   = GetNthRecord ( 拠点別計画進捗::前月繰越 ; i ) ;
+    _当月目標   = GetNthRecord ( 拠点別計画進捗::c_当月目標 ; i ) ;
+    _実績       = GetNthRecord ( 拠点別計画進捗::実績 ; i ) ;
+    _卸受注完了 = GetNthRecord ( 拠点別計画進捗::卸受注完了 ; i ) ;
+    _受注残     = GetNthRecord ( 拠点別計画進捗::受注残 ; i ) ;
+    _達成率     = GetNthRecord ( 拠点別計画進捗::達成率 ; i ) ;
+    _専売       = GetNthRecord ( 拠点別計画進捗::c_専売人数 ; i ) ;
+    _併売       = GetNthRecord ( 拠点別計画進捗::c_併売人数 ; i ) ;
+    _テレマ人数 = GetNthRecord ( 拠点別計画進捗::c_テレマ人数 ; i ) ;
+    _完工       = GetNthRecord ( 拠点別計画進捗::完工 ; i ) ;
+    _最終予測   = GetNthRecord ( 拠点別計画進捗::c_最終予測 ; i ) ;
+    _中間予測   = GetNthRecord ( 拠点別計画進捗::c_中間予測 ; i ) ;
+    _総受注     = GetNthRecord ( 拠点別計画進捗::総受注 ; i ) ;
+    _当月受注   = GetNthRecord ( 拠点別計画進捗::当月受注 ; i ) ;
+    _最終差異   = GetNthRecord ( 拠点別計画進捗::最終差異 ; i ) ;
+
+    matchYM = Case ( IsEmpty ( selYM_text ) ; 1 ; _年月 = selYM_num ) ;
+    show    = Case ( _分類 = "主力販路" and matchYM ; 1 ; 0 ) ;
+
+    /* 負のみ negative */
+    cls = Case ( GetAsNumber ( _最終差異 ) < 0 ; "negative" ; "" ) ;
+
+    _達成率_disp = GetAsText ( _達成率 ) ;
+    _運営会社_out = GetAsText ( _運営会社 ) ;
+
+    row =
+      "<tr>" &
+        "<td>" & Substitute ( GetAsText ( _拠点名 ) ;
+              [ "&" ; "&amp;" ] ; [ "<" ; "&lt;" ] ; [ ">" ; "&gt;" ] ;
+              [ "\"" ; "&quot;" ] ; [ "'" ; "&#39;" ] ) & "</td>" &
+        "<td style='text-align:left'>" & Substitute ( _運営会社_out ;
+              [ "&" ; "&amp;" ] ; [ "<" ; "&lt;" ] ; [ ">" ; "&gt;" ] ;
+              [ "\"" ; "&quot;" ] ; [ "'" ; "&#39;" ] ) & "</td>" &
+        "<td>" & GetAsText ( _前月繰越 ) & "</td>" &
+        "<td>" & GetAsText ( _当月目標 ) & "</td>" &
+        "<td>" & GetAsText ( _実績 ) & "</td>" &
+        "<td>" & GetAsText ( _卸受注完了 ) & "</td>" &
+        "<td>" & GetAsText ( _受注残 ) & "</td>" &
+        "<td>" & _達成率_disp & "</td>" &
+        "<td>" & GetAsText ( _専売 ) & "</td>" &
+        "<td>" & GetAsText ( _併売 ) & "</td>" &
+        "<td>" & GetAsText ( _テレマ人数 ) & "</td>" &
+        "<td>" & GetAsText ( _完工 ) & "</td>" &
+        "<td>" & GetAsText ( _最終予測 ) & "</td>" &
+        "<td>" & GetAsText ( _中間予測 ) & "</td>" &
+        "<td>" & GetAsText ( _総受注 ) & "</td>" &
+        "<td>" & GetAsText ( _当月受注 ) & "</td>" &
+        "<td class='" & cls & "'>" & GetAsText ( _最終差異 ) & "</td>" &
+      "</tr>" ;
+
+    html = html & Case ( show ; row ; "" ) ;
+    i = i + 1
+  ] ;
+  html
+) ) ;
+
+B_list =
+Let ([
+  kbn = "主力販路" ;
+  sql_text =
+  "SELECT \"前月繰越\",\"当月目標\",\"実績\",\"卸受注完了\",\"受注残\",
+          \"達成率\",
+          \"専売\",\"併売\",\"テレマ\",\"完工\",
+          \"最終予測\",\"中間予測\",\"総受注\",\"当月受注\",
+          \"最終差異\"
+   FROM \"拠点別計画進捗_集計\"
+   WHERE \"分類\" = ? AND \"年月\" = ?" ;
+  sql_num = sql_text ;
+
+  r1 = ExecuteSQL ( sql_text ; "|" ; "" ; kbn ; selYM_text ) ;
+  r2 = Case ( ( r1 = "?" or IsEmpty ( r1 ) ) and not IsEmpty ( selYM_num ) ;
+              ExecuteSQL ( sql_num ; "|" ; "" ; kbn ; selYM_num ) ; "" ) ;
+
+  raw = Case ( not IsEmpty ( r1 ) and r1 ≠ "?" ; r1 ;
+               not IsEmpty ( r2 ) and r2 ≠ "?" ; r2 ;
+               "" )
+] ; Substitute ( raw ; "|" ; "¶" ) ) ;
+
+tB_前月繰越   = GetAsNumber ( GetValue ( B_list ;  1 ) ) ;
+tB_当月目標   = GetAsNumber ( GetValue ( B_list ;  2 ) ) ;
+tB_実績       = GetAsNumber ( GetValue ( B_list ;  3 ) ) ;
+tB_卸受注完了 = GetAsNumber ( GetValue ( B_list ;  4 ) ) ;
+tB_受注残     = GetAsNumber ( GetValue ( B_list ;  5 ) ) ;
+tB_達成率表示 =                 GetValue ( B_list ;  6 ) ;
+tB_専売       = GetAsNumber ( GetValue ( B_list ;  7 ) ) ;
+tB_併売       = GetAsNumber ( GetValue ( B_list ;  8 ) ) ;
+tB_テレマ     = GetAsNumber ( GetValue ( B_list ;  9 ) ) ;
+tB_完工       = GetAsNumber ( GetValue ( B_list ; 10 ) ) ;
+tB_最終予測   = GetAsNumber ( GetValue ( B_list ; 11 ) ) ;
+tB_中間予測   = GetAsNumber ( GetValue ( B_list ; 12 ) ) ;
+tB_総受注     = GetAsNumber ( GetValue ( B_list ; 13 ) ) ;
+tB_当月受注   = GetAsNumber ( GetValue ( B_list ; 14 ) ) ;
+tB_最終差異   = GetAsNumber ( GetValue ( B_list ; 15 ) ) ;
+
+totalRowB =
+"<tr class='total'>" &
+  "<td colspan='2'>合計</td>" &
+  "<td>" & tB_前月繰越 & "</td>" &
+  "<td>" & tB_当月目標 & "</td>" &
+  "<td>" & tB_実績 & "</td>" &
+  "<td>" & tB_卸受注完了 & "</td>" &
+  "<td>" & tB_受注残 & "</td>" &
+  "<td>" & tB_達成率表示 & "</td>" &
+  "<td>" & tB_専売 & "</td>" &
+  "<td>" & tB_併売 & "</td>" &
+  "<td>" & tB_テレマ & "</td>" &
+  "<td>" & tB_完工 & "</td>" &
+  "<td>" & tB_最終予測 & "</td>" &
+  "<td>" & tB_中間予測 & "</td>" &
+  "<td>" & tB_総受注 & "</td>" &
+  "<td>" & tB_当月受注 & "</td>" &
+  "<td>" & tB_最終差異 & "</td>" &
+"</tr>" ;
+
+/* =========================
+   中堅販路（テレマ固定）
+   ========================= */
+rowsC =
+Let ([
+  idxList = List ( 拠点別計画進捗::主キー ) ;
+  n = ValueCount ( idxList )
+] ;
+
+While (
+  [ i = 1 ; html = "" ] ;
+  i ≤ n ;
+  [
+    _分類       = GetNthRecord ( 拠点別計画進捗::分類 ; i ) ;
+    _年月       = GetAsNumber ( GetNthRecord ( 拠点別計画進捗::年月 ; i ) ) ;
+    _拠点名     = GetNthRecord ( 拠点別計画進捗::c_加盟店セット名 ; i ) ;
+    _運営会社   = GetNthRecord ( 拠点別計画進捗::c_運営会社 ; i ) ;
+    _前月繰越   = GetNthRecord ( 拠点別計画進捗::前月繰越 ; i ) ;
+    _当月目標   = GetNthRecord ( 拠点別計画進捗::c_当月目標 ; i ) ;
+    _実績       = GetNthRecord ( 拠点別計画進捗::実績 ; i ) ;
+    _卸受注完了 = GetNthRecord ( 拠点別計画進捗::卸受注完了 ; i ) ;
+    _受注残     = GetNthRecord ( 拠点別計画進捗::受注残 ; i ) ;
+    _達成率     = GetNthRecord ( 拠点別計画進捗::達成率 ; i ) ;
+    _専売       = GetNthRecord ( 拠点別計画進捗::c_専売人数 ; i ) ;
+    _併売       = GetNthRecord ( 拠点別計画進捗::c_併売人数 ; i ) ;
+    _テレマ人数 = GetNthRecord ( 拠点別計画進捗::c_テレマ人数 ; i ) ;
+    _完工       = GetNthRecord ( 拠点別計画進捗::完工 ; i ) ;
+    _最終予測   = GetNthRecord ( 拠点別計画進捗::c_最終予測 ; i ) ;
+    _中間予測   = GetNthRecord ( 拠点別計画進捗::c_中間予測 ; i ) ;
+    _総受注     = GetNthRecord ( 拠点別計画進捗::総受注 ; i ) ;
+    _当月受注   = GetNthRecord ( 拠点別計画進捗::当月受注 ; i ) ;
+    _最終差異   = GetNthRecord ( 拠点別計画進捗::最終差異 ; i ) ;
+
+    matchYM = Case ( IsEmpty ( selYM_text ) ; 1 ; _年月 = selYM_num ) ;
+    show    = Case ( _分類 = "中堅販路" and matchYM ; 1 ; 0 ) ;
+
+    /* 負のみ negative */
+    cls = Case ( GetAsNumber ( _最終差異 ) < 0 ; "negative" ; "" ) ;
+
+    _達成率_disp = GetAsText ( _達成率 ) ;
+    _運営会社_out = GetAsText ( _運営会社 ) ;
+
+    row =
+      "<tr>" &
+        "<td>" & Substitute ( GetAsText ( _拠点名 ) ;
+              [ "&" ; "&amp;" ] ; [ "<" ; "&lt;" ] ; [ ">" ; "&gt;" ] ;
+              [ "\"" ; "&quot;" ] ; [ "'" ; "&#39;" ] ) & "</td>" &
+        "<td style='text-align:left'>" & Substitute ( _運営会社_out ;
+              [ "&" ; "&amp;" ] ; [ "<" ; "&lt;" ] ; [ ">" ; "&gt;" ] ;
+              [ "\"" ; "&quot;" ] ; [ "'" ; "&#39;" ] ) & "</td>" &
+        "<td>" & GetAsText ( _前月繰越 ) & "</td>" &
+        "<td>" & GetAsText ( _当月目標 ) & "</td>" &
+        "<td>" & GetAsText ( _実績 ) & "</td>" &
+        "<td>" & GetAsText ( _卸受注完了 ) & "</td>" &
+        "<td>" & GetAsText ( _受注残 ) & "</td>" &
+        "<td>" & _達成率_disp & "</td>" &
+        "<td>" & GetAsText ( _専売 ) & "</td>" &
+        "<td>" & GetAsText ( _併売 ) & "</td>" &
+        "<td>" & GetAsText ( _テレマ人数 ) & "</td>" &
+        "<td>" & GetAsText ( _完工 ) & "</td>" &
+        "<td>" & GetAsText ( _最終予測 ) & "</td>" &
+        "<td>" & GetAsText ( _中間予測 ) & "</td>" &
+        "<td>" & GetAsText ( _総受注 ) & "</td>" &
+        "<td>" & GetAsText ( _当月受注 ) & "</td>" &
+        "<td class='" & cls & "'>" & GetAsText ( _最終差異 ) & "</td>" &
+      "</tr>" ;
+
+    html = html & Case ( show ; row ; "" ) ;
+    i = i + 1
+  ] ;
+  html
+) ) ;
+
+C_list =
+Let ([
+  kbn = "中堅販路" ;
+  sql_text =
+  "SELECT \"前月繰越\",\"当月目標\",\"実績\",\"卸受注完了\",\"受注残\",
+          \"達成率\",
+          \"専売\",\"併売\",\"テレマ\",\"完工\",
+          \"最終予測\",\"中間予測\",\"総受注\",\"当月受注\",
+          \"最終差異\"
+   FROM \"拠点別計画進捗_集計\"
+   WHERE \"分類\" = ? AND \"年月\" = ?" ;
+  sql_num = sql_text ;
+
+  r1 = ExecuteSQL ( sql_text ; "|" ; "" ; kbn ; selYM_text ) ;
+  r2 = Case ( ( r1 = "?" or IsEmpty ( r1 ) ) and not IsEmpty ( selYM_num ) ;
+              ExecuteSQL ( sql_num ; "|" ; "" ; kbn ; selYM_num ) ; "" ) ;
+
+  raw = Case ( not IsEmpty ( r1 ) and r1 ≠ "?" ; r1 ;
+               not IsEmpty ( r2 ) and r2 ≠ "?" ; r2 ;
+               "" )
+] ; Substitute ( raw ; "|" ; "¶" ) ) ;
+
+tC_前月繰越   = GetAsNumber ( GetValue ( C_list ;  1 ) ) ;
+tC_当月目標   = GetAsNumber ( GetValue ( C_list ;  2 ) ) ;
+tC_実績       = GetAsNumber ( GetValue ( C_list ;  3 ) ) ;
+tC_卸受注完了 = GetAsNumber ( GetValue ( C_list ;  4 ) ) ;
+tC_受注残     = GetAsNumber ( GetValue ( C_list ;  5 ) ) ;
+tC_達成率表示 =                 GetValue ( C_list ;  6 ) ;
+tC_専売       = GetAsNumber ( GetValue ( C_list ;  7 ) ) ;
+tC_併売       = GetAsNumber ( GetValue ( C_list ;  8 ) ) ;
+tC_テレマ     = GetAsNumber ( GetValue ( C_list ;  9 ) ) ;
+tC_完工       = GetAsNumber ( GetValue ( C_list ; 10 ) ) ;
+tC_最終予測   = GetAsNumber ( GetValue ( C_list ; 11 ) ) ;
+tC_中間予測   = GetAsNumber ( GetValue ( C_list ; 12 ) ) ;
+tC_総受注     = GetAsNumber ( GetValue ( C_list ; 13 ) ) ;
+tC_当月受注   = GetAsNumber ( GetValue ( C_list ; 14 ) ) ;
+tC_最終差異   = GetAsNumber ( GetValue ( C_list ; 15 ) ) ;
+
+totalRowC =
+"<tr class='total'>" &
+  "<td colspan='2'>合計</td>" &
+  "<td>" & tC_前月繰越 & "</td>" &
+  "<td>" & tC_当月目標 & "</td>" &
+  "<td>" & tC_実績 & "</td>" &
+  "<td>" & tC_卸受注完了 & "</td>" &
+  "<td>" & tC_受注残 & "</td>" &
+  "<td>" & tC_達成率表示 & "</td>" &
+  "<td>" & tC_専売 & "</td>" &
+  "<td>" & tC_併売 & "</td>" &
+  "<td>" & tC_テレマ & "</td>" &
+  "<td>" & tC_完工 & "</td>" &
+  "<td>" & tC_最終予測 & "</td>" &
+  "<td>" & tC_中間予測 & "</td>" &
+  "<td>" & tC_総受注 & "</td>" &
+  "<td>" & tC_当月受注 & "</td>" &
+  "<td>" & tC_最終差異 & "</td>" &
+"</tr>" ;
+
+/* ========= 仕上げHTML ========= */
+html = 
+  css &
+  "<h3>大手販路</h3>
+   <table>" & thead & rowsA & totalRowA & "</table>" &
+  "<h3>主力販路</h3>
+   <table>" & thead & rowsB & totalRowB & "</table>" &
+  "<h3>中堅販路</h3>
+   <table>" & thead & rowsC & totalRowC & "</table>" &
+  /* 負の値だけ赤に */
+  "<script>(function(){function p(s){if(!s)return null;let t=String(s).trim().replace(/\u2212/g,'-').replace(/,/g,'').replace(/\s/g,'');if(/^-?\d+(\.\d+)?%?$/.test(t)){return parseFloat(t.replace(/%$/,''));}return null;}document.querySelectorAll('td').forEach(function(td){var v=p(td.textContent);if(v===null)return;if(v<0)td.classList.add('negative');});})();</script>" &
+  "</body></html>"
+] ;
+
+"data:text/html;base64," & Base64EncodeRFC ( 4648 ; html )
+)
