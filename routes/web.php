@@ -7,4 +7,5 @@ Route::get('/', function () {
     return view('hello');
 });
 
-Route::get('/tasks', [TaskController::class, 'index']);
+// RESTfulルーティング（7つのアクションが自動定義される）
+Route::resource('tasks', TaskController::class);
